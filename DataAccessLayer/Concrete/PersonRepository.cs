@@ -30,6 +30,12 @@ namespace DataAccessLayer.Concrete
             return person;
         }
 
+        public async Task<List<Person>> GetPersonByUserId(int userid)
+        {
+            var person = await db.Persons.Where(x => x.USER_ID == userid).ToListAsync();
+            return person;
+        }
+
         public async Task<Person> NewPerson(Person person)
         {
             db.Persons.Add(person);

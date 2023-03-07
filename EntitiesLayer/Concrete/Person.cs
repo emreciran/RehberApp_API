@@ -14,14 +14,17 @@ namespace EntityLayer.Concrete
         [Key]
         public int PERSON_ID { get; set; }
 
-        public string PERSON_NAME { get; set; } = string.Empty;
+        public string? PERSON_NAME { get; set; }
 
-        public string PERSON_SURNAME { get; set; } = string.Empty;
+        public string? PERSON_SURNAME { get; set; }
 
         [DataType(DataType.PhoneNumber)]
         public string? PERSON_PHONE { get; set; }
 
-        public string PERSON_DETAILS { get; set; } = string.Empty;
+        public string? PERSON_DETAILS { get; set; }
+
+        [Required]
+        public int USER_ID { get; set; }
 
         [Column(TypeName = "nvarchar(100)")]
         public string ImageName { get; set; } = string.Empty;

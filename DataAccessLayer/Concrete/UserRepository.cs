@@ -2,14 +2,13 @@
 using DataAccessLayer.Context;
 using EntityLayer.Concrete;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.IdentityModel.Tokens;
 using Shared;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace DataAccessLayer.Concrete
 {
@@ -17,233 +16,128 @@ namespace DataAccessLayer.Concrete
     {
         private UserManager<IdentityUser> _userManager;
         private ApplicationDbContext db;
-        private IConfiguration _configuration;
-        private IMailRepository _mailRepository;
 
-        public UserRepository(UserManager<IdentityUser> userManager, ApplicationDbContext db, IConfiguration configuration, IMailRepository mailRepository)
+        public UserRepository(UserManager<IdentityUser> userManager, ApplicationDbContext db)
         {
             _userManager = userManager;
             this.db = db;
-            _configuration = configuration;
-            _mailRepository = mailRepository;
         }
 
-        public async Task<UserManagerResponse> LoginUser(LoginViewModel model)
+        public async Task<User> GetUserByUsername(string username)
         {
-            if (model == null)
-                throw new NullReferenceException("Login model is null!");
+            var user = await _userManager.FindByNameAsync(username);
+            var errors = new List<string>();
 
+            if (user == null)
+            {
+                errors.Add("Kullanıcı bulunamadı!");
+                return null;
+            }
+
+            var userDetails = await db.Users.FirstOrDefaultAsync(x => x.Username == username);
+
+            if (userDetails == null)
+            {
+                errors.Add("Kullanıcı bulunamadı!");
+                return null;
+            }
+
+            return new User
+            {
+                CreatedDate = userDetails.CreatedDate,
+                Email = userDetails.Email,
+                Name = userDetails.Name,
+                Surname = userDetails.Surname,
+                Username = userDetails.Username,
+                USER_ID = userDetails.USER_ID
+            };
+        }
+
+        public async Task<UserManagerResponse> UpdateUserProfile(User user)
+        {
+            if (user == null)
+            {
+                return null;
+            } 
+
+            var userDetails = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.USER_ID == user.USER_ID);
+            if (userDetails == null)
+            {
+                return null;
+            }
+            
+
+            var updatedUser = new User
+            {
+                CreatedDate = userDetails.CreatedDate,
+                Email = user.Email,
+                Name = user.Name,
+                Surname = user.Surname,
+                Username = user.Username,
+                USER_ID = userDetails.USER_ID
+            };
+
+            //var identityUser = await _userManager.FindByEmailAsync(userDetails.Email);
+            //if (identityUser == null)
+            //{
+            //    return null;
+            //}
+
+            db.Users.Update(updatedUser);
+            await db.SaveChangesAsync();
+
+            return new UserManagerResponse
+            {
+                Message = "Kullanıcı bilgileri güncellendi!",
+                IsSuccess = true
+            };
+        }
+
+        public async Task<UserManagerResponse> UpdateUserPassword(ChangePasswordViewModel model)
+        {
             var user = await _userManager.FindByEmailAsync(model.Email);
-
             if (user == null)
             {
                 return new UserManagerResponse
                 {
-                    Message = "Girdiğiniz email adresine ait hesap bulunamadı!",
                     IsSuccess = false,
+                    Message = "Kullanıcı bulunamadı!"
                 };
             }
 
-            var result = await _userManager.CheckPasswordAsync(user, model.Password);
-
-            if (!result)
+            if (!await _userManager.CheckPasswordAsync(user, model.CurrentPassword))
             {
                 return new UserManagerResponse
                 {
-                    Message = "Email veya şifreniz hatalı!",
                     IsSuccess = false,
+                    Message = "Mevcut şifreniz hatalı!"
                 };
             }
 
-            var emailConfirmExist = user.EmailConfirmed;
-            if (!emailConfirmExist)
+            if (model.NewPassword != model.ConfirmPassword)
             {
                 return new UserManagerResponse
                 {
-                    Message = "Giriş yapmak için email adresinizi doğrulamanız gerekmektedir!",
                     IsSuccess = false,
+                    Message = "Onay şifreniz hatalı!"
                 };
             }
 
-            var jwtToken = await GenerateJwtToken(user);
-
-            var authResult = new AuthResult
+            if (model.CurrentPassword == model.NewPassword)
             {
-                Token = jwtToken.Token,
-                Success = jwtToken.Success,
-                Errors = jwtToken.Errors
-            };
+                return new UserManagerResponse
+                {
+                    IsSuccess = false,
+                    Message = "Yeni şifreniz eski şifrenizden farklı olmalıdır!"
+                };
+            }
+
+            await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
 
             return new UserManagerResponse
             {
-                Message = "",
                 IsSuccess = true,
-                AuthResult = authResult
-            };
-        }
-
-        public async Task<UserManagerResponse> RegisterUser(RegisterViewModel model)
-        {
-            if (model == null)
-                throw new NullReferenceException("Register model is null!");
-
-            var existingEmail = await _userManager.FindByEmailAsync(model.Email);
-            var existingUsername = await _userManager.FindByNameAsync(model.Username);
-
-            if (existingEmail != null)
-            {
-                return new UserManagerResponse
-                {
-                    Message = "Bu email zaten kullanılıyor",
-                    IsSuccess = false
-                };
-            }
-
-            if (existingUsername != null)
-            {
-                return new UserManagerResponse
-                {
-                    Message = "Bu kullanıcı adı zaten kullanılıyor",
-                    IsSuccess = false
-                };
-            }
-
-            if (model.Password != model.ConfirmPassword)
-            {
-                return new UserManagerResponse
-                {
-                    Message = "Şifreniz onay şifresi ile eşleşmiyor",
-                    IsSuccess = false
-                };
-            }
-
-            var user = new IdentityUser
-            {
-                Email = model.Email,
-                UserName = model.Username
-            };
-
-            var userDetails = new User
-            {
-                Name = model.Name,
-                Surname = model.Surname,
-                Email = model.Email,
-                Username = model.Username,
-                CreatedDate = DateTime.Now
-            };
-
-            var result = await _userManager.CreateAsync(user, model.Password);
-
-            if (result.Succeeded)
-            {
-                var confirmEmailToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-
-                var encodedEmailToken = Encoding.UTF8.GetBytes(confirmEmailToken);
-                var validEmailToken = WebEncoders.Base64UrlEncode(encodedEmailToken);
-
-                string url = $"{_configuration["AppURL"]}/api/auth/confirmemail?userid={user.Id}&token={validEmailToken}";
-
-                string subject = "E postanızı onaylayınız";
-                string body = $"<h1>Rehber App</h1>" +
-                    $"<p>E postanızı onaylamak için lütfen <a href='{url}'>Tıklayınız</a></p>";
-
-                await _mailRepository.SendEmailAsync(user.Email, subject, body);
-
-                db.Users.Add(userDetails);
-                await db.SaveChangesAsync();
-
-                return new UserManagerResponse
-                {
-                    Message = "Kullanıcı başarıyla oluşturuldu",
-                    IsSuccess = true,
-                };
-            }
-
-            return new UserManagerResponse
-            {
-                Message = "Kullanıcı oluşturulamadı!",
-                IsSuccess = false,
-                Errors = result.Errors.Select(x => x.Description)
-            };
-        }
-
-        public async Task<AuthResult> GenerateJwtToken(IdentityUser user)
-        {
-            var jwtTokenHandler = new JwtSecurityTokenHandler();
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["JWT:Key"]));
-
-            var claims = await GetAllValidClaims(user);
-
-            var tokenDescriptor = new SecurityTokenDescriptor
-            {
-                Subject = new ClaimsIdentity(claims),
-                Expires = DateTime.Now.AddDays(1),
-                SigningCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature)
-            };
-
-            var token = jwtTokenHandler.CreateToken(tokenDescriptor);
-            var jwtToken = jwtTokenHandler.WriteToken(token);
-
-            return new AuthResult
-            {
-                Token = jwtToken,
-                Success = true,
-            };
-        }
-
-        public async Task<List<Claim>> GetAllValidClaims(IdentityUser user)
-        {
-            var userEmail = user.Email;
-            var userDetails = await db.Users.Where(x => x.Email == userEmail).FirstOrDefaultAsync();
-
-            var claims = new List<Claim>
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(JwtRegisteredClaimNames.Sub, user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.GivenName, userDetails.Name),
-                new Claim(ClaimTypes.Surname, userDetails.Surname),
-            };
-
-            var userClaims = await _userManager.GetClaimsAsync(user);
-            claims.AddRange(userClaims);
-
-            return claims;
-        }
-
-        public async Task<UserManagerResponse> ConfirmEmail(string userid, string token)
-        {
-            var user = await _userManager.FindByIdAsync(userid);
-            if(user == null)
-            {
-                return new UserManagerResponse
-                {
-                    Message = "Kullanıcı bulunamadı!",
-                    IsSuccess = false
-                };
-            }
-
-            var decodedToken = WebEncoders.Base64UrlDecode(token);
-            var normalToken = Encoding.UTF8.GetString(decodedToken);
-
-            var result = await _userManager.ConfirmEmailAsync(user, normalToken);
-
-            if(result.Succeeded)
-            {
-                return new UserManagerResponse
-                {
-                    Message = "Email başarıyla onaylandı.",
-                    IsSuccess = true,
-                };
-            }
-
-            return new UserManagerResponse
-            {
-                IsSuccess = false,
-                Message = "Email onaylanmadı!",
-                Errors = result.Errors.Select(e => e.Description)
+                Message = "Şifreniz başarıyla değiştirildi!"
             };
         }
     }

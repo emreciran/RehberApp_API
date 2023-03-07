@@ -1,5 +1,6 @@
 ﻿using BusinessLayer.Abstract;
 using DataAccessLayer.Abstract;
+using EntityLayer.Concrete;
 using Shared;
 using System;
 using System.Collections.Generic;
@@ -18,19 +19,19 @@ namespace BusinessLayer.Concrete
             _userRepository = userRepository;
         }
 
-        public async Task<UserManagerResponse> ConfirmEmail(string userid, string token)
+        public async Task<User> GetUserByUsername(string username)
         {
-            return await _userRepository.ConfirmEmail(userid, token);
+            return await _userRepository.GetUserByUsername(username);
         }
 
-        public async Task<UserManagerResponse> LoginUser(LoginViewModel model)
+        public async Task<UserManagerResponse> UpdateUserPassword(ChangePasswordViewModel model)
         {
-            return await _userRepository.LoginUser(model);
+            return await _userRepository.UpdateUserPassword(model);
         }
 
-        public async Task<UserManagerResponse> RegisterUser(RegisterViewModel model)
+        public async Task<UserManagerResponse> UpdateUserProfile(User user)
         {
-            return await _userRepository.RegisterUser(model);
+            return await _userRepository.UpdateUserProfile(user);
         }
     }
 }

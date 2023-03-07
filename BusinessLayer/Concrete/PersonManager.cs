@@ -33,6 +33,11 @@ namespace BusinessLayer.Concrete
             return await _personRepository.GetPersonById(id);
         }
 
+        public async Task<List<Person>> GetPersonByUserId(int userid)
+        {
+            return await _personRepository.GetPersonByUserId(userid);
+        }
+
         public async Task<Person> NewPerson(Person person)
         {
             return await _personRepository.NewPerson(person);

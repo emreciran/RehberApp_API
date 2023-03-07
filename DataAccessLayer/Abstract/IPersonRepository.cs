@@ -13,6 +13,8 @@ namespace DataAccessLayer.Abstract
 
         Task<Person> GetPersonById(int id);
 
+        Task<List<Person>> GetPersonByUserId(int userid);
+
         Task<Person> NewPerson(Person person);
 
         Task<Person> UpdatePerson(Person person);

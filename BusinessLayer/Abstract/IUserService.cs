@@ -1,4 +1,5 @@
-﻿using Shared;
+﻿using EntityLayer.Concrete;
+using Shared;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,10 +10,10 @@ namespace BusinessLayer.Abstract
 {
     public interface IUserService
     {
-        Task<UserManagerResponse> LoginUser(LoginViewModel model);
+        Task<User> GetUserByUsername(string username);
 
-        Task<UserManagerResponse> RegisterUser(RegisterViewModel model);
+        Task<UserManagerResponse> UpdateUserProfile(User user);
 
-        Task<UserManagerResponse> ConfirmEmail(string userid, string token);
+        Task<UserManagerResponse> UpdateUserPassword(ChangePasswordViewModel model);
     }
 }

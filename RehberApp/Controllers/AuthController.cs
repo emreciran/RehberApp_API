@@ -1,6 +1,8 @@
 ﻿using BusinessLayer.Abstract;
 using BusinessLayer.Concrete;
 using DataAccessLayer.Abstract;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -13,13 +15,13 @@ namespace RehberApp.Controllers
     public class AuthController : ControllerBase
     {
         private UserManager<IdentityUser> _userManager;
-        private IUserRepository _userRepository;
+        private IAuthRepository _authRepository;
         IConfiguration _configuration { get; set; }
 
-        public AuthController(UserManager<IdentityUser> userManager, IUserRepository userRepository, IConfiguration configuration)
+        public AuthController(UserManager<IdentityUser> userManager, IAuthRepository authRepository, IConfiguration configuration)
         {
             _userManager = userManager;
-            _userRepository = userRepository;
+            _authRepository = authRepository;
             _configuration = configuration;
         }
 
@@ -28,7 +30,7 @@ namespace RehberApp.Controllers
         {
             if (ModelState.IsValid)
             {
-                var result = await _userRepository.RegisterUser(model);
+                var result = await _authRepository.RegisterUser(model);
 
                 if(result.IsSuccess) return Ok(result);
 
@@ -43,7 +45,7 @@ namespace RehberApp.Controllers
         {
             if (ModelState.IsValid)
             {
-                var result = await _userRepository.LoginUser(model);
+                var result = await _authRepository.LoginUser(model);
 
                 if (result.IsSuccess)
                 {
@@ -51,10 +53,11 @@ namespace RehberApp.Controllers
 
                     HttpContext.Response.Cookies.Append("jwt", jwt, new CookieOptions
                     {
-                        HttpOnly = true,
+                        Secure = true,
+                        HttpOnly = false,
                         Expires = DateTime.Now.AddDays(1),
                         SameSite = SameSiteMode.None,
-                        IsEssential = true
+                        IsEssential = true,
                     });
 
                     return Ok(result);
@@ -74,7 +77,7 @@ namespace RehberApp.Controllers
                 return NotFound();
             }
 
-            var result = await _userRepository.ConfirmEmail(userid, token);
+            var result = await _authRepository.ConfirmEmail(userid, token);
 
             if (result.IsSuccess)
             {
@@ -82,6 +85,28 @@ namespace RehberApp.Controllers
             }
 
             return BadRequest(result);
+        }
+
+        [HttpPost("ForgotPassword")]
+        public async Task<IActionResult> ForgotPassword(string email)
+        {
+            if (string.IsNullOrEmpty(email)) return BadRequest();
+
+            var result = await _authRepository.ForgotPassword(email);
+
+            if (result.IsSuccess) return Ok(result);
+
+            return BadRequest(result);
+        }
+
+        [HttpPost("ResetPassword")]
+        public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+        {
+            var response = await _authRepository.ResetPassword(model);
+
+            if(response.IsSuccess) return Ok(response);
+
+            return BadRequest(response);
         }
     }
 }

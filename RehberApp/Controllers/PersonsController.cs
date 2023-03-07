@@ -39,6 +39,15 @@ namespace RehberApp.Controllers
             return Ok(person);
         }
 
+        [HttpGet("GetPersonByUser/{userid}")]
+        public async Task<IActionResult> GetPersonByUserId(int userid)
+        {
+            var person = await _personService.GetPersonByUserId(userid);
+            if (!person.Any()) return Ok("Person not found!");
+
+            return Ok(person);
+        }
+
         [HttpPost]
         public async Task<IActionResult> NewPerson([FromForm]Person person)
         {
