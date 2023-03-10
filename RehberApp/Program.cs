@@ -69,6 +69,9 @@ builder.Services.AddScoped<IPersonRepository, PersonRepository>();
 builder.Services.AddScoped<IAuthService, AuthManager>();
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 
+builder.Services.AddScoped<IRoleService, RoleManager>();
+builder.Services.AddScoped<IRoleRepository, RoleRepository>();
+
 builder.Services.AddScoped<IUserService, UserManager>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 
@@ -85,7 +88,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors(x => x
-    .WithOrigins(new[] { "http://localhost:3000" })
+    .WithOrigins(new [] { "http://localhost:19006" })
     .AllowAnyMethod()
     .AllowCredentials()
     .AllowAnyHeader());

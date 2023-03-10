@@ -27,7 +27,7 @@ namespace EntityLayer.Concrete
         public int USER_ID { get; set; }
 
         [Column(TypeName = "nvarchar(100)")]
-        public string ImageName { get; set; } = string.Empty;
+        public string ImageName { get; set; } = "DefaultPerson.png";
 
         [NotMapped]
         public IFormFile? ImageFile { get; set; }

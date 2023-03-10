@@ -57,15 +57,22 @@ namespace DataAccessLayer.Concrete
         {
             if (user == null)
             {
-                return null;
+                return new UserManagerResponse
+                {
+                    IsSuccess = false,
+                    Message = "Hata!"
+                };
             } 
 
             var userDetails = await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.USER_ID == user.USER_ID);
             if (userDetails == null)
             {
-                return null;
-            }
-            
+                return new UserManagerResponse
+                {
+                    IsSuccess = false,
+                    Message = "Kullanıcı bulunamadı!"
+                };
+            }            
 
             var updatedUser = new User
             {
@@ -76,12 +83,6 @@ namespace DataAccessLayer.Concrete
                 Username = user.Username,
                 USER_ID = userDetails.USER_ID
             };
-
-            //var identityUser = await _userManager.FindByEmailAsync(userDetails.Email);
-            //if (identityUser == null)
-            //{
-            //    return null;
-            //}
 
             db.Users.Update(updatedUser);
             await db.SaveChangesAsync();

@@ -19,13 +19,15 @@ namespace DataAccessLayer.Concrete
         private ApplicationDbContext db;
         private IConfiguration _configuration;
         private IMailRepository _mailRepository;
+        private RoleManager<IdentityRole> _roleManager;
 
-        public AuthRepository(UserManager<IdentityUser> userManager, ApplicationDbContext db, IConfiguration configuration, IMailRepository mailRepository)
+        public AuthRepository(UserManager<IdentityUser> userManager, ApplicationDbContext db, IConfiguration configuration, IMailRepository mailRepository, RoleManager<IdentityRole> roleManager)
         {
             _userManager = userManager;
             this.db = db;
             _configuration = configuration;
             _mailRepository = mailRepository;
+            _roleManager = roleManager;
         }
 
         public async Task<UserManagerResponse> LoginUser(LoginViewModel model)
@@ -65,6 +67,8 @@ namespace DataAccessLayer.Concrete
                 };
             }
 
+            var userRole = await _userManager.GetRolesAsync(user);
+
             var jwtToken = await GenerateJwtToken(user);
 
             var authResult = new AuthResult
@@ -78,6 +82,7 @@ namespace DataAccessLayer.Concrete
             {
                 Message = "",
                 IsSuccess = true,
+                Role = userRole,
                 AuthResult = authResult
             };
         }
@@ -129,13 +134,16 @@ namespace DataAccessLayer.Concrete
                 Surname = model.Surname,
                 Email = model.Email,
                 Username = model.Username,
-                CreatedDate = DateTime.Now
+                CreatedDate = DateTime.Now,
+                Role = "User"
             };
 
             var result = await _userManager.CreateAsync(user, model.Password);
 
             if (result.Succeeded)
             {
+                await _userManager.AddToRoleAsync(user, "User");
+
                 var confirmEmailToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
 
                 var encodedEmailToken = Encoding.UTF8.GetBytes(confirmEmailToken);
@@ -152,9 +160,12 @@ namespace DataAccessLayer.Concrete
                 db.Users.Add(userDetails);
                 await db.SaveChangesAsync();
 
+                var userRoles = await _userManager.GetRolesAsync(user);
+
                 return new UserManagerResponse
                 {
                     Message = "Kullanıcı başarıyla oluşturuldu",
+                    Role = userRoles,
                     IsSuccess = true,
                 };
             }
@@ -283,6 +294,24 @@ namespace DataAccessLayer.Concrete
 
             var userClaims = await _userManager.GetClaimsAsync(user);
             claims.AddRange(userClaims);
+
+            var userRoles = await _userManager.GetRolesAsync(user);
+
+            foreach (var userRole in userRoles)
+            {
+                var role = await _roleManager.FindByNameAsync(userRole);
+
+                if(role != null)
+                {
+                    claims.Add(new Claim(ClaimTypes.Role, userRole));
+
+                    var roleCliams = await _roleManager.GetClaimsAsync(role);
+                    foreach (var roleClaim in roleCliams)
+                    {
+                        claims.Add(roleClaim);
+                    }
+                }
+            }
 
             return claims;
         }
